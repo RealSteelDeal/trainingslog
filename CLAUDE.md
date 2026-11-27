@@ -16,9 +16,12 @@ web/src/lib/pb.js            PocketBase-Client (same origin)
 web/src/lib/data.js          Katalog-Cache, Vorlagen-Auflösung (resolveTemplate), Vorwerte
 web/src/lib/outbox.js        Offline-Warteschlange, schrittweiser Upload mit client_id
 web/src/lib/live.svelte.js   laufende Einheit ($state + localStorage), Zeiten über Zeitstempel
+web/src/lib/stats.js         Auswertungen: Server-Daten + Outbox zusammenführen, Wochen-Soll/Ist, CSV
+web/src/lib/*Chart.svelte    Diagramme als Inline-SVG, ohne Bibliothek
 web/src/routes/+page.svelte  Login, Vorlagen, letzte Einheiten, Sync-Status
 web/src/routes/einheit/      Einheit erfassen und abschließen
-web/tests/unit/              node:test (Vorlagen, Outbox) – liest Startdaten aus der Seed-Migration
+web/src/routes/auswertung/   Woche (Soll/Ist), Verlauf pro Übung, Schulterwert, CSV-Export
+web/tests/unit/              node:test (Vorlagen, Outbox, Auswertungen) – liest Startdaten aus der Seed-Migration
 web/tests/e2e/               Playwright gegen gemockte API (tests/helpers/mock-api.js)
 tools/import-artifact.mjs    Import des JSON-Exports aus dem alten claude.ai-Artefakt
 ```
@@ -46,6 +49,7 @@ tools/import-artifact.mjs    Import des JSON-Exports aus dem alten claude.ai-Art
 - Phase a (Woche 1–2): 2 Sätze, Kraft 22 / Ausdauer 28 min. Phase b (ab Woche 3): 3 Sätze, Kraft 30 / Ausdauer 20 min.
 - Schulter zweimal am Labrum operiert. Keine Übungen vorschlagen mit Dips, Nackendrücken/-latzug, Butterfly mit tiefer Dehnung, breitem Bankdrücken bis zur Brust, schwerem Überkopfdrücken. Schulterwert 0–10 wird pro Einheit erfasst.
 - Ziel: Gesundheit und Ausdauer zuerst, dazu Rücken (Ausgleich Bürojob), Brust, Arme.
+- Auswertung: Wochen-Soll fest 2 Krafttage und Zone 2 = 2 × `cardio_min` der auf der Startseite gewählten Phase. Mittwoch ist Bonus, nicht im Soll. WHO 150 min (Zone 2 + Aufwärmen) nur als neutraler Hinweis, ohne Ampel. Wartende Outbox-Einheiten zählen mit.
 
 ## Befehle
 

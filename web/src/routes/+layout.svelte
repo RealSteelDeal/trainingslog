@@ -32,6 +32,9 @@
 		--acc: #ff5a1f;
 		--sup: light-dark(#1d4ed8, #86a5ff);
 		--disp: 'Barlow Condensed', Inter, sans-serif;
+		--c-line: light-dark(#1d4ed8, #6f8ff0);
+		--c-z2: light-dark(#1d4ed8, #6f8ff0);
+		--c-warm: light-dark(#e08a3c, #d9853a);
 	}
 	:global(*) { box-sizing: border-box; min-width: 0; }
 	:global(body) {

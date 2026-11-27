@@ -105,6 +105,8 @@
 			{/each}
 		</section>
 
+		<a class="btn stats" href="/auswertung">Auswertungen</a>
+
 		<section>
 			<h2>Letzte Einheiten</h2>
 			{#if recent.length}
@@ -135,5 +137,6 @@
 	.recent li { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
 	.recent li span:first-child { font-weight: 600; min-width: 6.5em; }
 	.logout { margin-top: 28px; }
+	.stats { width: 100%; margin-top: 16px; }
 	@media (max-width: 560px) { .tpl { grid-template-columns: minmax(0, 1fr); } }
 </style>

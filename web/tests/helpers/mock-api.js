@@ -5,9 +5,9 @@ const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
 const token = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ id: 'u1', type: 'auth', collectionId: '_pb_users_auth_', exp: Math.floor(Date.now() / 1000) + 86400 })}.sig`;
 const user = { id: 'u1', email: 'test@example.at', collectionId: '_pb_users_auth_', collectionName: 'users' };
 
-export async function mockApi(page, { offline = () => false } = {}) {
+export async function mockApi(page, { offline = () => false, failWrites = () => false, preset = {} } = {}) {
 	const seed = loadSeed();
-	const db = { sessions: [], set_logs: [], cardio_logs: [] };
+	const db = { sessions: [], set_logs: [], cardio_logs: [], ...structuredClone(preset) };
 	const list = (items) => ({ page: 1, perPage: 500, totalItems: items.length, totalPages: 1, items });
 	await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
 	await page.route(/\/api\//, async (route) => {
@@ -18,6 +18,7 @@ export async function mockApi(page, { offline = () => false } = {}) {
 		const c = /\/collections\/([a-z_]+)\/records/.exec(url)?.[1];
 		if (!c) return route.fulfill({ status: 404, json: {} });
 		if (req.method() === 'POST') {
+			if (failWrites()) return route.fulfill({ status: 503, json: { message: 'Wartung' } });
 			const d = { ...JSON.parse(req.postData()), id: `${c}_${db[c].length}`, created: new Date().toISOString() };
 			db[c].push(d);
 			return route.fulfill({ json: d });
