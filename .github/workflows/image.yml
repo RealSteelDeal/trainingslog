@@ -20,16 +20,17 @@ jobs:
           tags: trainingslog:test
       - name: Smoke-Test (Migrationen, Startdaten, Rechte)
         run: |
-          docker run -d --name t -p 8090:8090 trainingslog:test
+          trap "docker logs tlsmoke 2>&1 | tail -30" ERR
+          docker run -d --name tlsmoke -p 8090:8090 trainingslog:test
           for i in $(seq 1 30); do curl -fs http://127.0.0.1:8090/api/health && break; sleep 1; done
-          docker exec t /pb/pocketbase superuser upsert ci@example.com ci-Passwort-123 --dir /pb/pb_data
+          docker exec tlsmoke /pb/pocketbase superuser upsert ci@example.com ci-Passwort-123 --dir /pb/pb_data
           TOKEN=$(curl -fs -X POST http://127.0.0.1:8090/api/collections/_superusers/auth-with-password -H 'Content-Type: application/json' -d '{"identity":"ci@example.com","password":"ci-Passwort-123"}' | jq -r .token)
           T=$(curl -fs http://127.0.0.1:8090/api/collections/templates/records -H "Authorization: $TOKEN" | jq .totalItems)
           E=$(curl -fs http://127.0.0.1:8090/api/collections/exercises/records -H "Authorization: $TOKEN" | jq .totalItems)
           ANON=$(curl -s http://127.0.0.1:8090/api/collections/sessions/records | jq .totalItems)
           curl -fs http://127.0.0.1:8090/ | grep -q manifest.webmanifest
           echo "Vorlagen=$T Übungen=$E Einheiten-anonym=$ANON"
-          docker logs t
+          docker logs tlsmoke 2>&1 | tail -20
           test "$T" = 2 && test "$E" = 12 && test "$ANON" = 0
       - uses: docker/login-action@v3
         with:
