@@ -92,7 +92,7 @@
 		</header>
 
 		{#if live.s}
-			<a class="btn primary resume" href="/einheit"><span>Laufende Einheit fortsetzen</span><span aria-hidden="true">›</span></a>
+			<a class="btn primary resume" href="/einheit"><span>{live.s.ended ? 'Einheit abschließen' : 'Laufende Einheit fortsetzen'}</span><span aria-hidden="true">›</span></a>
 		{/if}
 
 		{#if kraftTpl}

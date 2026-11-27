@@ -21,7 +21,7 @@ web/src/lib/stats.js         Auswertungen: Server-Daten + Outbox zusammenführen
 web/src/lib/*Chart.svelte    Diagramme als Inline-SVG, ohne Bibliothek
 web/src/lib/ExerciseHelp.svelte  Bottom-Sheet mit Übungshilfe (Gerät, Ausführung, Schulter, Fehler, Alternativen)
 web/src/routes/+page.svelte  Login, Vorlagen, letzte Einheiten, Sync-Status
-web/src/routes/einheit/      Einheit erfassen und abschließen (Übungskarten mit Stepper, „Jetzt“-Markierung, Hilfe)
+web/src/routes/einheit/      Einheit erfassen (Übungskarten mit Stepper, „Jetzt“-Markierung, Hilfe); Kopfzeile verkleinert sich beim Scrollen, Uhr öffnet die Steuerung (Pause, Beenden, Verwerfen – je mit Sicherheitsfrage); Abschlussfragen erst nach „Training beenden“
 web/src/routes/auswertung/   Woche (Soll/Ist), Verlauf pro Übung, Schulterwert, CSV-Export
 web/tests/unit/              node:test (Vorlagen, Outbox, Auswertungen) – liest Startdaten und Hilfetexte aus den Daten-Migrationen
 web/tests/e2e/               Playwright gegen gemockte API (tests/helpers/mock-api.js)

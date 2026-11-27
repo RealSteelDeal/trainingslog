@@ -9,7 +9,9 @@
 	const catalog = cachedCatalog();
 	const last = cachedLastValues();
 	let now = $state(Date.now());
-	let confirmDiscard = $state(false);
+	let compact = $state(false);
+	let menu = $state(null); // null | 'menu' | 'end' | 'discard'
+	let menuDlg = $state();
 	let saving = $state(false);
 	let helpEx = $state(null);
 	const exByKey = Object.fromEntries(catalog.exercises.map((e) => [e.key, e]));
@@ -57,6 +59,35 @@
 		const c = s.clock;
 		if (c.since) { c.acc += (Date.now() - c.since) / 1000; c.since = null; } else c.since = Date.now();
 		persist();
+	}
+
+	$effect(() => {
+		if (!menuDlg) return;
+		if (menu && !menuDlg.open) menuDlg.showModal();
+		else if (!menu && menuDlg.open) menuDlg.close();
+	});
+
+	function endTraining() {
+		if (s.clock.since) toggleClock();
+		for (const t of Object.values(s.timers)) if (t.since) { t.left = timerLeft(t, Date.now()); t.since = null; }
+		s.rest = null;
+		s.ended = new Date().toISOString();
+		persist();
+		menu = null;
+		scrollTo({ top: 0 });
+	}
+
+	function resumeTraining() {
+		s.ended = null;
+		if (!s.clock.since) toggleClock();
+		persist();
+		menu = null;
+	}
+
+	function discard() {
+		menu = null;
+		discardSession();
+		goto('/');
 	}
 
 	function tapSet(it, i) {
@@ -109,7 +140,7 @@
 				kind: tpl.kind,
 				phase: s.phaseKey,
 				started: s.startedAt,
-				ended: new Date().toISOString(),
+				ended: s.ended || new Date().toISOString(),
 				duration_min: Math.round(elapsed / 60),
 				volume_kg: Math.round(volume),
 				shoulder: Math.round(num(s.fin.shoulder)),
@@ -135,27 +166,34 @@
 				if (t?.since && timerLeft(t, now) <= 0) { t.left = 0; t.since = null; persist(); try { navigator.vibrate?.([200, 100, 200]); } catch {} }
 			}
 		}, 500);
+		// Hysterese: Die Kopfzeile ändert beim Umschalten ihre Höhe und damit scrollY; eine einzige Schwelle würde flackern.
+		const onScroll = () => { if (!compact && scrollY > 64) compact = true; else if (compact && scrollY < 8) compact = false; };
+		addEventListener('scroll', onScroll, { passive: true });
 		let wake = null;
 		navigator.wakeLock?.request('screen').then((w) => (wake = w)).catch(() => {});
-		return () => { clearInterval(iv); wake?.release?.(); };
+		return () => { clearInterval(iv); removeEventListener('scroll', onScroll); wake?.release?.(); };
 	});
 </script>
 
 {#if s && plan}
-	<header class="bar">
+	<header class="bar" class:compact>
 		<a class="icon" href="/" aria-label="Zur Startseite, die Einheit läuft weiter">‹</a>
 		<div class="ttl">
 			<b>{tpl.name}</b>
 			<span>{done}/{items.length} erledigt{plan.phase ? ` · ${plan.phase.label}` : ''}</span>
 		</div>
-		<button class="clock" class:paused={!s.clock.since} onclick={toggleClock} aria-label={s.clock.since ? 'Zeit pausieren' : 'Zeit fortsetzen'}>
+		{#if !s.ended}
+			<button class="pp" class:paused={!s.clock.since} onclick={toggleClock} aria-label={s.clock.since ? 'Zeit pausieren' : 'Zeit fortsetzen'}>{s.clock.since ? '❚❚' : '▶'}</button>
+		{/if}
+		<button class="clock" class:paused={!s.clock.since && !s.ended} onclick={() => (menu = 'menu')} aria-haspopup="dialog" aria-label="Steuerung öffnen, Zeit {fmt(elapsed)}">
 			<span class="num">{fmt(elapsed)}</span>
-			<span class="ic" aria-hidden="true">{s.clock.since ? '❚❚' : '▶'}</span>
+			<span class="ic" aria-hidden="true">•••</span>
 		</button>
 		<div class="prog" aria-hidden="true"><span style="width:{(done / items.length) * 100}%"></span></div>
 	</header>
 
 	<main>
+		{#if !s.ended}
 		{#each plan.blocks as b (b.id)}
 			<section class="block">
 				<h2>{b.name} <em>{b.minutes} min</em></h2>
@@ -227,6 +265,11 @@
 			</section>
 		{/each}
 
+		<section class="endzone">
+			<p class="mute">{done} von {items.length} erledigt</p>
+			<button class="primary endbtn" onclick={() => (menu = 'end')}>Training beenden</button>
+		</section>
+		{:else}
 		<section class="card fin">
 			<h2>Einheit abschließen</h2>
 			<p class="mute">{loggedSets} {loggedSets === 1 ? 'Satz' : 'Sätze'} erfasst · Dauer {fmt(elapsed)}</p>
@@ -245,10 +288,9 @@
 			</div>
 			<label>Notiz <textarea rows="2" maxlength="1000" bind:value={s.fin.note} onchange={persist} placeholder="z. B. Brustpresse links leichtes Ziehen"></textarea></label>
 			<button class="primary save" disabled={saving} onclick={finish}>Einheit speichern</button>
-			<button class="discard" onclick={() => { if (confirmDiscard) { discardSession(); goto('/'); } else { confirmDiscard = true; setTimeout(() => (confirmDiscard = false), 3000); } }}>
-				{confirmDiscard ? 'Wirklich verwerfen? Nochmal tippen' : 'Einheit verwerfen'}
-			</button>
+			<button class="discard" onclick={resumeTraining}>Zurück zum Training</button>
 		</section>
+		{/if}
 	</main>
 
 	<div class="rest" class:show={restLeft > 0} aria-live="polite">
@@ -258,11 +300,39 @@
 	</div>
 
 	<ExerciseHelp ex={helpEx} onclose={() => (helpEx = null)} />
+
+	<dialog bind:this={menuDlg} class="sheet ctlsheet" aria-labelledby="ctl-title" onclose={() => (menu = null)} onclick={(e) => e.target === menuDlg && menuDlg.close()}>
+		<div class="inner">
+			<div class="grip" aria-hidden="true"></div>
+			{#if menu === 'end'}
+				<h2 id="ctl-title">Training beenden?</h2>
+				<p>Die Zeit wird bei <b>{fmt(elapsed)}</b> angehalten. Danach kommen die Abschlussfragen.{#if done < items.length}{' '}Noch {items.length - done} {items.length - done === 1 ? 'Übung' : 'Übungen'} offen.{/if}</p>
+				<button class="primary" onclick={endTraining}>Ja, beenden</button>
+				<button onclick={() => (menu = null)}>Abbrechen</button>
+			{:else if menu === 'discard'}
+				<h2 id="ctl-title">Einheit verwerfen?</h2>
+				<p>Alle Eingaben dieser Einheit gehen verloren. Das lässt sich nicht rückgängig machen.</p>
+				<button class="danger" onclick={discard}>Ja, verwerfen</button>
+				<button onclick={() => (menu = null)}>Abbrechen</button>
+			{:else}
+				<h2 id="ctl-title">Training</h2>
+				<p class="big"><span class="num">{fmt(elapsed)}</span><span class="mute">{s.ended ? 'beendet' : s.clock.since ? 'läuft' : 'pausiert'} · {done}/{items.length} erledigt</span></p>
+				{#if s.ended}
+					<button class="primary" onclick={resumeTraining}>Zurück zum Training</button>
+				{:else}
+					<button onclick={toggleClock}>{s.clock.since ? 'Zeit pausieren' : 'Zeit fortsetzen'}</button>
+					<button class="primary" onclick={() => (menu = 'end')}>Training beenden</button>
+				{/if}
+				<button class="danger-out" onclick={() => (menu = 'discard')}>Einheit verwerfen</button>
+				<button onclick={() => (menu = null)}>Schließen</button>
+			{/if}
+		</div>
+	</dialog>
 {/if}
 
 <style>
 	.bar {
-		position: sticky; top: 0; z-index: 5; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 10px; align-items: center;
+		position: sticky; top: 0; z-index: 5; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto auto; gap: 8px; align-items: center;
 		padding: calc(8px + env(safe-area-inset-top)) 16px 10px; margin-top: calc(-1 * env(safe-area-inset-top));
 		background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
 		border-bottom: 1px solid var(--line);
@@ -271,11 +341,21 @@
 	.ttl { display: grid; line-height: 1.25; }
 	.ttl b { font: 700 19px/1.1 var(--disp); display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 	.ttl span { font-size: 13px; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.pp { width: 44px; padding: 0; border-radius: 50%; font-size: 13px; color: var(--acc); background: var(--soft); border: 1px solid var(--line); }
+	.pp.paused { background: var(--acc); border-color: var(--acc); color: #fff; }
+	.bar.compact { padding-top: calc(4px + env(safe-area-inset-top)); padding-bottom: 6px; }
+	.bar.compact .ttl b { font-size: 16px; -webkit-line-clamp: 1; line-clamp: 1; }
+	.bar.compact .ttl span { display: none; }
+	.bar.compact .clock { min-height: 44px; }
+	.bar.compact .clock .num { font-size: 22px; }
 	.clock { gap: 8px; padding: 0 12px; background: var(--soft); color: var(--ink); border: 1px solid var(--line); min-height: 48px; border-radius: 14px; }
 	.clock .num { font: 700 28px/1 var(--disp); font-variant-numeric: tabular-nums; }
-	.clock .ic { font-size: 12px; color: var(--acc); }
+	.clock .ic { font-size: 10px; letter-spacing: 1px; color: var(--mute); }
 	.clock.paused { background: var(--acc); border-color: var(--acc); color: #fff; }
 	.clock.paused .ic { color: #fff; }
+	.endzone { margin-top: 32px; display: grid; gap: 8px; text-align: center; }
+	.endzone p { margin: 0; }
+	.endbtn { min-height: 56px; font-size: 17px; }
 	.prog { grid-column: 1 / -1; height: 4px; background: var(--soft); border-radius: 2px; overflow: hidden; }
 	.prog span { display: block; height: 100%; background: var(--acc); transition: width .3s; }
 
@@ -326,7 +406,7 @@
 	.box.chk { width: 44px; height: 44px; flex: none; }
 	.box[aria-pressed='true'] { background: var(--acc); border-color: var(--acc); color: #fff; }
 
-	.fin { margin-top: 32px; border: 2px solid var(--ink); display: grid; gap: 14px; }
+	.fin { margin-top: 16px; border: 2px solid var(--ink); display: grid; gap: 14px; }
 	.fin label { display: grid; gap: 6px; font-size: 15px; }
 	.fin p { margin: 0; }
 	.row2 { display: flex; justify-content: space-between; align-items: baseline; }
@@ -339,6 +419,24 @@
 	.save { font-size: 17px; min-height: 52px; }
 	.discard { background: transparent; color: var(--mute); }
 
+	.sheet {
+		margin: auto 0 0; width: 100%; max-width: 100%; max-height: 88dvh; padding: 0; border: 0; border-radius: 22px 22px 0 0;
+		background: var(--card); color: var(--ink); box-shadow: 0 -8px 30px rgb(0 0 0 / .3); overflow-y: auto;
+	}
+	.sheet[open] { animation: up .22s ease-out; }
+	.sheet::backdrop { background: rgb(0 0 0 / .45); }
+	@keyframes up { from { transform: translateY(40px); opacity: .4; } }
+	@media (min-width: 700px) { .sheet { margin: auto; max-width: 480px; border-radius: 22px; } }
+	.inner { padding: 8px 20px calc(20px + env(safe-area-inset-bottom)); display: grid; gap: 10px; }
+	.grip { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 0 auto 4px; }
+	.ctlsheet h2 { font-size: 26px; }
+	.ctlsheet p { margin: 0 0 6px; }
+	.ctlsheet button { min-height: 52px; font-size: 17px; }
+	.big { display: grid; }
+	.big .num { font: 700 48px/1 var(--disp); font-variant-numeric: tabular-nums; }
+	.danger { background: light-dark(#b42318, #e5484d); border: 0; color: #fff; }
+	.danger-out { color: light-dark(#b42318, #ff8a7a); background: transparent; }
+
 	.rest {
 		position: fixed; inset: auto 0 0 0; z-index: 6; background: var(--ink); color: var(--bg);
 		padding: 14px 16px calc(14px + env(safe-area-inset-bottom)); display: flex; gap: 14px; align-items: center;
@@ -349,5 +447,5 @@
 	.rb { flex: 1; height: 8px; background: rgba(127, 127, 127, .35); border-radius: 4px; overflow: hidden; }
 	.rb span { display: block; height: 100%; background: var(--acc); }
 	.rest button { background: transparent; color: var(--bg); border-color: currentColor; min-height: 48px; }
-	@media (prefers-reduced-motion: reduce) { .rest, .prog span, .it { transition: none; } }
+	@media (prefers-reduced-motion: reduce) { .rest, .prog span, .it { transition: none; } .sheet[open] { animation: none; } }
 </style>

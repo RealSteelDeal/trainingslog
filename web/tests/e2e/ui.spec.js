@@ -87,3 +87,72 @@ for (const width of [390, 360]) {
 		expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
 	});
 }
+
+test('Kopfzeile verkleinert sich beim Scrollen und bleibt oben', async ({ page }) => {
+	await startKraft(page);
+	const bar = page.locator('header.bar');
+	const tall = (await bar.boundingBox()).height;
+	await page.mouse.wheel(0, 1500);
+	await expect(bar).toHaveClass(/compact/);
+	const box = await bar.boundingBox();
+	expect(box.y).toBe(0);
+	expect(box.height).toBeLessThan(tall);
+	await expect(page.getByRole('button', { name: /Steuerung öffnen/ })).toBeVisible();
+});
+
+test('Steuerung: Pause, Beenden mit Sicherheitsfrage, Abschlussfragen erst danach', async ({ page }) => {
+	await startKraft(page);
+	await expect(page.getByRole('heading', { name: 'Einheit abschließen' })).toHaveCount(0);
+	await expect(page.getByText('Einheit speichern')).toHaveCount(0);
+
+	await page.getByRole('button', { name: /Steuerung öffnen/ }).click();
+	const sheet = page.getByRole('dialog', { name: 'Training' });
+	await sheet.getByRole('button', { name: 'Zeit pausieren' }).click();
+	await expect(sheet).toContainText('pausiert');
+	await sheet.getByRole('button', { name: 'Training beenden' }).click();
+	const confirm = page.getByRole('dialog', { name: 'Training beenden?' });
+	await expect(confirm).toContainText('Noch 12 Übungen offen');
+	await confirm.getByRole('button', { name: 'Abbrechen' }).click();
+	await expect(page.getByRole('dialog')).toBeHidden();
+	await expect(page.locator('.it').first()).toBeVisible();
+
+	await page.getByRole('button', { name: /Steuerung öffnen/ }).click();
+	await page.getByRole('dialog', { name: 'Training' }).getByRole('button', { name: 'Training beenden' }).click();
+	await page.getByRole('button', { name: 'Ja, beenden' }).click();
+	await expect(page.getByRole('heading', { name: 'Einheit abschließen' })).toBeVisible();
+	await expect(page.locator('.it')).toHaveCount(0);
+	await expect(page.getByRole('button', { name: 'Zeit pausieren' })).toHaveCount(0);
+
+	await page.reload();
+	await expect(page.getByRole('heading', { name: 'Einheit abschließen' })).toBeVisible();
+	await page.getByRole('button', { name: 'Zurück zum Training' }).click();
+	await expect(page.locator('.it').first()).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Zeit pausieren' })).toBeVisible();
+});
+
+test('Verwerfen nur nach Sicherheitsfrage', async ({ page }) => {
+	await startKraft(page);
+	await page.getByRole('button', { name: /Steuerung öffnen/ }).click();
+	await page.getByRole('button', { name: 'Einheit verwerfen' }).click();
+	const confirm = page.getByRole('dialog', { name: 'Einheit verwerfen?' });
+	await confirm.getByRole('button', { name: 'Abbrechen' }).click();
+	await expect(page).toHaveURL(/\/einheit$/);
+	await page.getByRole('button', { name: /Steuerung öffnen/ }).click();
+	await page.getByRole('button', { name: 'Einheit verwerfen' }).click();
+	await page.getByRole('button', { name: 'Ja, verwerfen' }).click();
+	await expect(page).toHaveURL(/\/$/);
+	expect(await page.evaluate(() => localStorage.getItem('tl-live'))).toBeNull();
+});
+
+test('Kopfzeile flackert nicht an der Umschaltschwelle', async ({ page }) => {
+	await startKraft(page);
+	for (const y of [30, 40, 50, 64, 70]) {
+		await page.evaluate((v) => scrollTo(0, v), y);
+		const states = await page.evaluate(() => new Promise((res) => {
+			const out = [];
+			const f = () => { out.push(document.querySelector('header.bar').classList.contains('compact')); out.length < 10 ? requestAnimationFrame(f) : res(out); };
+			f();
+		}));
+		expect(new Set(states.slice(3)).size, `scrollY ${y}`).toBe(1);
+	}
+});
