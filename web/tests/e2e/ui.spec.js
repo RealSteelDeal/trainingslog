@@ -63,7 +63,7 @@ test('Phase wird sofort gemerkt und ändert die Satzzahl', async ({ page }) => {
 	await mockApi(page);
 	await login(page);
 	await page.getByRole('radio', { name: /Ab Woche 3/ }).click();
-	expect(await page.evaluate(() => localStorage.getItem('tl-phase'))).toBe('b');
+	expect(await page.evaluate(() => JSON.parse(localStorage.getItem('tl-phase-log')).log[0].phase)).toBe('b');
 	await page.locator('.tpl').first().locator('button.primary').click();
 	await expect(item(page, 'Beinpresse').locator('.set')).toHaveCount(3);
 });

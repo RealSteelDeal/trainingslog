@@ -11,14 +11,16 @@
 	const P = { l: 40, r: 12, t: 14, b: 28 };
 	const GAP = 2;
 
-	const soll = $derived(weeks[0]?.soll || 0);
-	const ticks = $derived(niceTicks(0, Math.max(WHO_MINUTES, soll, ...weeks.map((k) => k.total)) * 1.05));
+	const lastSoll = $derived(weeks[weeks.length - 1]?.soll || 0);
+	const ticks = $derived(niceTicks(0, Math.max(WHO_MINUTES, ...weeks.map((k) => Math.max(k.total, k.soll))) * 1.05));
 	const top = $derived(ticks[ticks.length - 1]);
 	const band = $derived((w - P.l - P.r) / Math.max(1, weeks.length));
 	const bw = $derived(Math.min(24, band * 0.55));
 	const cx = (i) => P.l + band * (i + 0.5);
 	const y = (v) => P.t + (1 - v / top) * (H - P.t - P.b);
 	const hgt = (v) => (v / top) * (H - P.t - P.b);
+	// Soll als Stufenlinie: jede Woche hat ihr eigenes Soll (Phasenwechsel).
+	const sollPath = $derived(weeks.map((k, i) => `${i ? 'L' : 'M'}${i ? cx(i) - band / 2 : P.l},${y(k.soll)}H${i === weeks.length - 1 ? w - P.r : cx(i) + band / 2}`).join(''));
 
 	function pick(e) {
 		const r = e.currentTarget.getBoundingClientRect();
@@ -77,9 +79,9 @@
 				<text class="ax" x={cx(i)} y={H - 8} text-anchor="middle">KW {k.week}</text>
 			{/if}
 		{/each}
-		{#if soll}
-			<line class="ref" x1={P.l} x2={w - P.r} y1={y(soll)} y2={y(soll)} />
-			<text class="rl" x={w - P.r} y={y(soll) - 5} text-anchor="end">Soll {soll}</text>
+		{#if lastSoll}
+			<path class="ref step" d={sollPath} />
+			<text class="rl" x={w - P.r} y={y(lastSoll) - 5} text-anchor="end">Soll {lastSoll}</text>
 		{/if}
 		<line class="ref who" x1={P.l} x2={w - P.r} y1={y(WHO_MINUTES)} y2={y(WHO_MINUTES)} />
 		<text class="rl" x={w - P.r} y={y(WHO_MINUTES) - 5} text-anchor="end">WHO {WHO_MINUTES}</text>
@@ -88,7 +90,7 @@
 		{@const k = weeks[active]}
 		<div class="tip" style="left:{tipLeft}px" role="status">
 			<b>KW {k.week} · ab {fmtShort(k.start)}</b>
-			<span>Zone 2: {k.zone2} min</span>
+			<span>Zone 2: {k.zone2} von {k.soll} min</span>
 			<span>Aufwärmen: {k.warm} min</span>
 			<span>Summe: {k.total} min</span>
 			{#if k.pending}<span class="pend">inkl. noch nicht hochgeladen</span>{/if}
@@ -116,6 +118,7 @@
 	.hl { fill: var(--soft); }
 	.ref { stroke: var(--ink); stroke-width: 1.5; }
 	.ref.who { stroke: var(--mute); stroke-width: 1; }
+	.step { fill: none; stroke-linejoin: round; }
 	.tip {
 		position: absolute; top: -8px; width: 160px; transform: translateY(-100%); pointer-events: none;
 		background: var(--ink); color: var(--bg); border-radius: 10px; padding: 6px 10px; font-size: 13px; line-height: 1.4;

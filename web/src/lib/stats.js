@@ -120,7 +120,7 @@ export function cardioSoll(templates, phaseKey) {
 	return phase ? KRAFT_SOLL * Number(phase.cardio_min) : 0;
 }
 
-/** Die letzten `weeks` Wochen bis einschließlich der aktuellen, älteste zuerst. */
+/** Die letzten `weeks` Wochen bis einschließlich der aktuellen, älteste zuerst. `soll`: Zahl oder (Wochenstart) => Zahl. */
 export function weekSummary(entries, { soll, now = new Date(), weeks = 8 }) {
 	const out = [];
 	const current = weekStart(now);
@@ -144,7 +144,7 @@ export function weekSummary(entries, { soll, now = new Date(), weeks = 8 }) {
 			zone2,
 			warm,
 			total: zone2 + warm,
-			soll,
+			soll: typeof soll === 'function' ? soll(start) : soll,
 			pending: inWeek.some((e) => e.pending)
 		});
 	}
