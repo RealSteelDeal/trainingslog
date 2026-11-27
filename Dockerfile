@@ -12,7 +12,7 @@ ARG PB_VERSION=0.40.6
 ARG TARGETARCH=amd64
 RUN apk add --no-cache ca-certificates unzip wget \
  && wget -q "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_${TARGETARCH}.zip" -O /tmp/pb.zip \
- && unzip /tmp/pb.zip pocketbase -d /pb && rm /tmp/pb.zip \
+ && unzip /tmp/pb.zip pocketbase -d /pb && rm /tmp/pb.zip
 
 COPY backend/pb_migrations /pb/pb_migrations
 COPY --from=web /app/build /pb/pb_public
