@@ -18,7 +18,7 @@ export async function loadCatalog() {
 			pb.collection('templates').getFullList({ sort: 'sort' })
 		]);
 		const cat = {
-			exercises: exercises.map(({ id, key, name, kind, hint }) => ({ id, key, name, kind, hint })),
+			exercises: exercises.map(({ id, key, name, kind, hint, help }) => ({ id, key, name, kind, hint, help: help || null })),
 			templates: templates.map(({ id, key, name, kind, phases, blocks }) => ({ id, key, name, kind, phases, blocks }))
 		};
 		write(CAT_KEY, cat);
@@ -71,6 +71,21 @@ export function resolveTemplate(tpl, phaseKey, exercises) {
 }
 
 export const defaultReps = (reps) => Number(String(reps).split(/[–-]/).pop()) || 0;
+export const minReps = (reps) => Number(String(reps).split(/[–-]/)[0]) || 0;
+
+export const PROGRESSION_STEP_KG = 2.5;
+
+/**
+ * Steigerungsvorschlag: Haben beim letzten Mal alle Sätze die obere
+ * Wiederholungsgrenze erreicht, das schwerste Gewicht um einen Schritt erhöhen.
+ */
+export function progressionHint(lastSets, reps, step = PROGRESSION_STEP_KG) {
+	const top = defaultReps(reps);
+	if (!top || !lastSets?.length) return null;
+	if (!lastSets.every((x) => Number(x.reps) >= top && Number(x.kg) > 0)) return null;
+	const from = Math.max(...lastSets.map((x) => Number(x.kg)));
+	return { from, kg: Math.round((from + step) * 100) / 100, reps: minReps(reps) || top, top };
+}
 
 /** Sätze der letzten Einheit pro Übung (für Vorwerte). */
 export async function loadLastValues() {

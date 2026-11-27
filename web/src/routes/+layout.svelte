@@ -1,6 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { flush } from '$lib/outbox';
+	import { syncPhaseLog } from '$lib/phase';
 	import { pb } from '$lib/pb';
 
 	let { children } = $props();
@@ -10,6 +11,7 @@
 			try { await pb.collection('users').authRefresh(); } catch (e) { if (e?.status === 401) pb.authStore.clear(); }
 		}
 		flush();
+		syncPhaseLog();
 	});
 </script>
 
@@ -45,9 +47,11 @@
 		overflow-x: clip;
 		padding: env(safe-area-inset-top) 0 calc(96px + env(safe-area-inset-bottom));
 	}
-	:global(main) { max-width: 760px; margin: 0 auto; padding: 20px max(4vw, 14px); }
+	:global(main) { max-width: 760px; margin: 0 auto; padding: 16px max(4vw, 16px); }
 	:global(h1), :global(h2) { font-family: var(--disp); font-weight: 700; line-height: 1.05; margin: 0; text-wrap: balance; }
 	:global(h1) { font-size: clamp(32px, 7vw, 46px); }
+	:global(html) { -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
+	:global(button) { touch-action: manipulation; }
 	:global(h2) { font-size: 28px; }
 	:global(.mute) { color: var(--mute); font-size: 14px; }
 	:global(button), :global(.btn) {

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { mockApi, login } from '../helpers/mock-api.js';
+import { mockApi, login, endTraining } from '../helpers/mock-api.js';
 
-const item = (page, name) => page.locator('.it', { hasText: name });
+const item = (page, name) => page.locator('.it').filter({ has: page.locator('h3', { hasText: name }) });
 
 test('Einheit erfassen, neu laden, speichern und hochladen', async ({ page }) => {
 	const db = await mockApi(page);
@@ -24,6 +24,7 @@ test('Einheit erfassen, neu laden, speichern und hochladen', async ({ page }) =>
 	await expect(page.locator('[aria-label="Gewicht Beinpresse"]')).toHaveValue('60');
 	await expect(item(page, 'Latzug').locator('[aria-label="Satz 1"]')).toHaveAttribute('aria-pressed', 'true');
 
+	await endTraining(page);
 	await page.fill('textarea', 'Test-Notiz');
 	await page.locator('input[type=range]').fill('3');
 	await page.click('text=Einheit speichern');
@@ -45,6 +46,7 @@ test('Offline gespeichert, später automatisch hochgeladen', async ({ page, cont
 	await page.locator('.tpl').nth(1).locator('button.primary').click(); // Mittwoch
 	offline = true;
 	await context.setOffline(true);
+	await endTraining(page);
 	await page.click('text=Einheit speichern');
 	await expect(page.getByText('1 Einheit wartet auf Upload')).toBeVisible();
 	expect(db.sessions.length).toBe(0);
