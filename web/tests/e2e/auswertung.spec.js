@@ -1,6 +1,6 @@
 import { test, expect, devices } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { mockApi, login } from '../helpers/mock-api.js';
+import { mockApi, login, endTraining } from '../helpers/mock-api.js';
 import { loadSeed } from '../helpers/seed.js';
 
 // iPhone 12 (Viewport, Touch) – im vorinstallierten Chromium statt WebKit.
@@ -85,6 +85,7 @@ test('Wartende Outbox-Einheit fließt in alle Auswertungen ein', async ({ page }
 	await page.locator('.tpl').first().locator('button.primary').click();
 	await page.fill('[aria-label="Gewicht Beinpresse"]', '70');
 	await page.locator('.it').filter({ has: page.locator('h3', { hasText: 'Beinpresse' }) }).locator('[aria-label="Satz 1"]').click();
+	await endTraining(page);
 	await page.locator('input[type=range]').fill('5');
 	await page.getByLabel('Ausdauer-Minuten').fill('30');
 	failWrites = true;

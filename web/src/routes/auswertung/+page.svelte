@@ -6,6 +6,7 @@
 	import { readOutbox, onOutbox } from '$lib/outbox';
 	import { loadStatsData, buildEntries, exerciseSeries, shoulderSeries, weekSummary, cardioSoll, toCsv, fmtDate, WHO_MINUTES } from '$lib/stats';
 	import { fmtNum } from '$lib/chart';
+	import { cachedPhaseLog, onPhaseLog, phaseAt, syncPhaseLog } from '$lib/phase';
 	import LineChart from '$lib/LineChart.svelte';
 	import WeekChart from '$lib/WeekChart.svelte';
 
@@ -18,13 +19,13 @@
 	let data = $state(null);
 	let catalog = $state(cachedCatalog());
 	let outbox = $state(readOutbox());
-	const phaseKey = localStorage.getItem('tl-phase') || 'a';
+	let phaseLog = $state(cachedPhaseLog());
 
 	const entries = $derived(data ? buildEntries(data, outbox, catalog) : []);
 	const kraftTpl = $derived(catalog.templates.find((t) => t.kind === 'kraft' && t.phases?.length));
+	const phaseKey = $derived(phaseAt(phaseLog, new Date()));
 	const phase = $derived(kraftTpl?.phases.find((p) => p.key === phaseKey) || kraftTpl?.phases[0]);
-	const soll = $derived(cardioSoll(catalog.templates, phaseKey));
-	const weeks = $derived(weekSummary(entries, { soll }));
+	const weeks = $derived(weekSummary(entries, { soll: (start) => cardioSoll(catalog.templates, phaseAt(phaseLog, start)) }));
 	const now = $derived(weeks[weeks.length - 1]);
 	const kraftEx = $derived(catalog.exercises.filter((e) => e.kind === 'kraft'));
 	const series = $derived(exerciseSeries(entries, exKey));
@@ -43,6 +44,7 @@
 
 	async function load() {
 		catalog = await loadCatalog();
+		syncPhaseLog();
 		data = await loadStatsData();
 	}
 
@@ -67,7 +69,9 @@
 		if (TABS.some((t) => t[0] === q.get('tab'))) tab = q.get('tab');
 		if (q.get('u')) exKey = q.get('u');
 		load();
-		return onOutbox((items) => { outbox = items; if (!items.length) load(); });
+		const offPhase = onPhaseLog((log) => (phaseLog = log));
+		const offOutbox = onOutbox((items) => { outbox = items; if (!items.length) load(); });
+		return () => { offPhase(); offOutbox(); };
 	});
 </script>
 
@@ -106,7 +110,7 @@
 						</div>
 						<div class="kpi">
 							<span class="k">Zone 2</span>
-							<span class="v">{fmtNum(now.zone2, 0)}<small>{' / '}{soll} min</small></span>
+							<span class="v">{fmtNum(now.zone2, 0)}<small>{' / '}{now.soll} min</small></span>
 							<span class="mute">Aufwärmen {fmtNum(now.warm, 0)} min</span>
 						</div>
 						<div class="kpi">
@@ -126,8 +130,8 @@
 					<h3>Ausdauer-Minuten pro Woche</h3>
 					<WeekChart {weeks} />
 					<p class="mute small">
-						Soll Zone 2: 2 × {phase?.cardio_min ?? 0} min ({phase?.label ?? '–'}, Phase auf der Startseite gewählt).
-						WHO 150 bezieht sich auf die Summe aus Zone 2 und Aufwärmen.
+						Soll Zone 2 pro Woche: 2 × die Ausdauer-Minuten der Phase, die in der Woche galt (aktuell {phase?.label ?? '–'}: 2 × {phase?.cardio_min ?? 0} min).
+						Ein Phasenwechsel gilt ab der Woche, in der du ihn auf der Startseite einstellst. WHO 150 bezieht sich auf die Summe aus Zone 2 und Aufwärmen.
 					</p>
 				</section>
 

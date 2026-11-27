@@ -1,6 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { flush } from '$lib/outbox';
+	import { syncPhaseLog } from '$lib/phase';
 	import { pb } from '$lib/pb';
 
 	let { children } = $props();
@@ -10,6 +11,7 @@
 			try { await pb.collection('users').authRefresh(); } catch (e) { if (e?.status === 401) pb.authStore.clear(); }
 		}
 		flush();
+		syncPhaseLog();
 	});
 </script>
 

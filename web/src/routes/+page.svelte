@@ -5,6 +5,7 @@
 	import { loadCatalog, cachedCatalog, loadLastValues, resolveTemplate } from '$lib/data';
 	import { readOutbox, onOutbox, flush } from '$lib/outbox';
 	import { live, startSession } from '$lib/live.svelte.js';
+	import { cachedPhaseLog, onPhaseLog, phaseAt, setPhase, syncPhaseLog } from '$lib/phase';
 
 	let user = $state(pb.authStore.isValid ? pb.authStore.record : null);
 	let email = $state('');
@@ -14,7 +15,8 @@
 	let recent = $state([]);
 	let outbox = $state(readOutbox());
 	let online = $state(true);
-	let phaseKey = $state(localStorage.getItem('tl-phase') || 'a');
+	let phaseLog = $state(cachedPhaseLog());
+	const phaseKey = $derived(phaseAt(phaseLog, new Date()));
 
 	pb.authStore.onChange(() => (user = pb.authStore.isValid ? pb.authStore.record : null));
 
@@ -26,6 +28,7 @@
 			recent = (await pb.collection('sessions').getList(1, 10, { sort: '-started' })).items;
 		} catch { /* offline */ }
 		flush();
+		syncPhaseLog();
 	}
 
 	async function login(e) {
@@ -41,14 +44,12 @@
 	}
 
 	function start(t) {
-		localStorage.setItem('tl-phase', phaseKey);
 		startSession(t.key, t.phases?.length ? phaseKey : '');
 		goto('/einheit');
 	}
 
 	function pickPhase(k) {
-		phaseKey = k;
-		try { localStorage.setItem('tl-phase', k); } catch { /* gesperrt */ }
+		phaseLog = setPhase(k);
 	}
 
 	const kraftTpl = $derived(catalog.templates.find((t) => t.phases?.length));
@@ -61,8 +62,9 @@
 		addEventListener('online', on);
 		addEventListener('offline', off);
 		const un = onOutbox((items) => { outbox = items; if (!items.length) load(); });
+		const unPhase = onPhaseLog((log) => (phaseLog = log));
 		load();
-		return () => { removeEventListener('online', on); removeEventListener('offline', off); un(); };
+		return () => { removeEventListener('online', on); removeEventListener('offline', off); un(); unPhase(); };
 	});
 </script>
 
@@ -90,7 +92,7 @@
 		</header>
 
 		{#if live.s}
-			<a class="btn primary resume" href="/einheit"><span>Laufende Einheit fortsetzen</span><span aria-hidden="true">›</span></a>
+			<a class="btn primary resume" href="/einheit"><span>{live.s.ended ? 'Einheit abschließen' : 'Laufende Einheit fortsetzen'}</span><span aria-hidden="true">›</span></a>
 		{/if}
 
 		{#if kraftTpl}
