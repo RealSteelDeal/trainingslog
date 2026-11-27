@@ -62,6 +62,12 @@ PocketBase lokal (Binary 0.40.6 von GitHub-Releases, im Repo-Root):
 
 Vor jedem Commit: `npm run test:unit`, `npm run build`, `npm run test:e2e`. Neue Funktionen bekommen Tests im gleichen Commit.
 
+## Cloud-Sitzungen
+
+- PocketBase liegt unter `/usr/local/bin/pocketbase` (0.40.6): `pocketbase serve --dir=<tmp>/pb_data --migrationsDir=backend/pb_migrations`. Superuser per `pocketbase superuser upsert <mail> <pass> --dir=<tmp>/pb_data`.
+- Playwright-Browser ist vorinstalliert: `npm run test:e2e -- --trace off` läuft ohne `PW_CHROMIUM_PATH` und ohne `playwright install`.
+- Arbeitsweise: eigener Branch + Pull Request, nie direkt auf `main`. Der Merge auf `main` rollt automatisch live aus.
+
 ## Deployment
 
 Push auf `main` → GitHub Actions (`.github/workflows/image.yml`):
