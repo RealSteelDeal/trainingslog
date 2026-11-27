@@ -5,6 +5,7 @@
 	import { enqueue, flush } from '$lib/outbox';
 	import { live, persist, discardSession, elapsedSec, timerLeft } from '$lib/live.svelte.js';
 	import ExerciseHelp from '$lib/ExerciseHelp.svelte';
+	import { schedulePush, cancelPush, scheduleUploadCheck, uploadRef } from '$lib/push';
 
 	const catalog = cachedCatalog();
 	const last = cachedLastValues();
@@ -74,7 +75,25 @@
 		else if (!menu && menuDlg.open) menuDlg.close();
 	});
 
+	// Push-Jobs dieser Einheit beginnen mit startedAt; so lassen sie sich gemeinsam stornieren.
+	const restRef = () => `${s.startedAt}|rest`;
+	const timerRef = (it) => `${s.startedAt}|timer|${it.id}`;
+	const shortName = (name) => name.split(',')[0];
+
+	// Nach der Pause geht es in der eigenen Supersatz-Gruppe weiter, sonst mit der nächsten offenen Übung.
+	function nextAfterRest(it) {
+		const open = items.filter((x) => !isDone(x));
+		return open.find((x) => x.block === it.block && x.group && x.group === it.group) || open.find((x) => items.indexOf(x) > items.indexOf(it)) || open[0] || null;
+	}
+
+	function clearRest() {
+		s.rest = null;
+		persist();
+		cancelPush(restRef());
+	}
+
 	function endTraining() {
+		cancelPush(`${s.startedAt}|`, true);
 		if (s.clock.since) toggleClock();
 		for (const t of Object.values(s.timers)) if (t.since) { t.left = timerLeft(t, Date.now()); t.since = null; }
 		s.rest = null;
@@ -93,6 +112,8 @@
 
 	function discard() {
 		menu = null;
+		cancelPush(`${s.startedAt}|`, true);
+		cancelPush(uploadRef(s.startedAt));
 		discardSession();
 		goto('/');
 	}
@@ -104,7 +125,15 @@
 		else {
 			const v = input(it);
 			while (list.length <= i) list.push({ kg: num(v.kg), reps: Math.round(num(v.reps)) });
-			if (it.rest && list.length < it.sets) s.rest = { until: Date.now() + it.rest * 1000, total: it.rest };
+			if (it.rest && list.length < it.sets) {
+				s.rest = { until: Date.now() + it.rest * 1000, total: it.rest };
+				const next = nextAfterRest(it);
+				schedulePush('rest', restRef(), s.rest.until, {
+					title: 'Pause vorbei',
+					body: next ? `Weiter mit ${shortName(next.name)}.` : 'Weiter geht’s.',
+					url: '/einheit'
+				});
+			}
 		}
 		persist();
 	}
@@ -112,12 +141,28 @@
 	function toggleTimer(it) {
 		if (!s.timers[it.id]) s.timers[it.id] = { left: it.seconds, since: null };
 		const t = s.timers[it.id];
-		if (t.since) { t.left = timerLeft(t, Date.now()); t.since = null; }
-		else { if (t.left <= 0) t.left = it.seconds; t.since = Date.now(); }
+		if (t.since) {
+			t.left = timerLeft(t, Date.now());
+			t.since = null;
+			cancelPush(timerRef(it));
+		} else {
+			if (t.left <= 0) t.left = it.seconds;
+			t.since = Date.now();
+			const block = plan.blocks.find((b) => b.id === it.block);
+			schedulePush('timer', timerRef(it), t.since + t.left * 1000, {
+				title: `${block?.name ?? shortName(it.name)}: Zeit ist um`,
+				body: 'Tippen, um weiterzumachen.',
+				url: '/einheit'
+			});
+		}
 		persist();
 	}
 
-	function toggleCheck(it) { s.checks[it.id] = !s.checks[it.id]; persist(); }
+	function toggleCheck(it) {
+		s.checks[it.id] = !s.checks[it.id];
+		if (it.type === 'timer' && s.checks[it.id]) cancelPush(timerRef(it));
+		persist();
+	}
 
 	function minutesIn(blockId) {
 		let sec = 0;
@@ -158,6 +203,7 @@
 			cardio
 		});
 		rememberLastValues(sets);
+		scheduleUploadCheck(s.startedAt);
 		discardSession();
 		flush();
 		goto('/');
@@ -315,7 +361,7 @@
 	<div class="rest" class:show={restLeft > 0} aria-live="polite">
 		<span class="num">Pause {fmt(restLeft)}</span>
 		<div class="rb"><span style="width:{s.rest ? (restLeft / s.rest.total) * 100 : 0}%"></span></div>
-		<button onclick={() => { s.rest = null; persist(); }}>Weiter</button>
+		<button onclick={clearRest}>Weiter</button>
 	</div>
 
 	<ExerciseHelp ex={helpEx} onclose={() => (helpEx = null)} />

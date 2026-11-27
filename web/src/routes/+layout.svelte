@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { flush } from '$lib/outbox';
 	import { syncPhaseLog } from '$lib/phase';
+	import { refreshPush } from '$lib/push';
 	import { pb } from '$lib/pb';
 
 	let { children } = $props();
@@ -12,6 +13,7 @@
 		}
 		flush();
 		syncPhaseLog();
+		refreshPush();
 	});
 </script>
 
