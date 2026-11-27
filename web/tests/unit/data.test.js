@@ -60,3 +60,15 @@ test('Hilfetexte: jede Übung hat Gerät, Ausführung und Schulter-Hinweis', () 
 	}
 	assert.match(exercises.find((e) => e.key === 'hy').help.geraet, /Hyperextension-Bank/);
 });
+
+test('Steigerungsvorschlag nur, wenn alle Sätze die obere Grenze erreicht haben', async () => {
+	const { progressionHint } = await import('../../src/lib/data.js');
+	assert.deepEqual(progressionHint([{ kg: 60, reps: 15 }, { kg: 60, reps: 15 }], '12–15'), { from: 60, kg: 62.5, reps: 12, top: 15 });
+	assert.equal(progressionHint([{ kg: 60, reps: 15 }, { kg: 60, reps: 14 }], '12–15'), null);
+	assert.deepEqual(progressionHint([{ kg: 20, reps: 12 }], '12'), { from: 20, kg: 22.5, reps: 12, top: 12 });
+	assert.deepEqual(progressionHint([{ kg: 57.5, reps: 16 }, { kg: 60, reps: 15 }], '12-15'), { from: 60, kg: 62.5, reps: 12, top: 15 });
+	assert.equal(progressionHint([{ kg: 0, reps: 15 }], '12–15'), null); // ohne Gewicht kein Vorschlag
+	assert.equal(progressionHint([], '12–15'), null);
+	assert.equal(progressionHint(undefined, '12–15'), null);
+	assert.equal(progressionHint([{ kg: 60, reps: 15 }], ''), null);
+});

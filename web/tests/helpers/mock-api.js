@@ -46,3 +46,10 @@ export async function login(page) {
 	await page.click('button:has-text("Anmelden")');
 	await page.waitForSelector('text=Ganzkörper · Krafttag');
 }
+
+/** Training über den Button am Listenende beenden und die Sicherheitsfrage bestätigen. */
+export async function endTraining(page) {
+	await page.locator('.endbtn').click();
+	await page.getByRole('dialog', { name: 'Training beenden?' }).getByRole('button', { name: 'Ja, beenden' }).click();
+	await page.getByRole('heading', { name: 'Einheit abschließen' }).waitFor();
+}
