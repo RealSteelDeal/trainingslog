@@ -5,6 +5,8 @@ COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
 RUN npm run build
+ARG GIT_SHA=dev
+RUN printf '{"sha":"%s"}\n' "$GIT_SHA" > build/version.json
 
 # 2) PocketBase mit Migrationen und gebautem Frontend
 FROM alpine:3.22

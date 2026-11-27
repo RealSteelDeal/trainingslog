@@ -1,13 +1,47 @@
-name: Image bauen
+name: Testen, bauen, ausrollen
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
+
 permissions:
   contents: read
   packages: write
+
+env:
+  IMAGE: ghcr.io/realsteeldeal/trainingslog
+  VPS_ID: "1972658"
+  PROJECT: trainingslog
+  APP_URL: https://training.schuetters.at
+
 jobs:
-  build:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run test:unit
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: web/test-results
+          retention-days: 7
+
+  image:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,7 +52,8 @@ jobs:
           context: .
           load: true
           tags: trainingslog:test
-      - name: Smoke-Test (Migrationen, Startdaten, Rechte)
+          build-args: GIT_SHA=${{ github.sha }}
+      - name: Smoke-Test (Migrationen, Startdaten, Rechte, Version)
         run: |
           trap "docker logs tlsmoke 2>&1 | tail -30" ERR
           docker run -d --name tlsmoke -p 8090:8090 trainingslog:test
@@ -28,18 +63,54 @@ jobs:
           T=$(curl -fs http://127.0.0.1:8090/api/collections/templates/records -H "Authorization: $TOKEN" | jq .totalItems)
           E=$(curl -fs http://127.0.0.1:8090/api/collections/exercises/records -H "Authorization: $TOKEN" | jq .totalItems)
           ANON=$(curl -s http://127.0.0.1:8090/api/collections/sessions/records | jq .totalItems)
+          V=$(curl -fs http://127.0.0.1:8090/version.json | jq -r .sha)
           curl -fs http://127.0.0.1:8090/ | grep -q manifest.webmanifest
-          echo "Vorlagen=$T Übungen=$E Einheiten-anonym=$ANON"
-          docker logs tlsmoke 2>&1 | tail -20
-          test "$T" = 2 && test "$E" = 12 && test "$ANON" = 0
-      - uses: docker/login-action@v3
+          echo "Vorlagen=$T Übungen=$E Einheiten-anonym=$ANON Version=$V"
+          test "$T" = 2 && test "$E" = 12 && test "$ANON" = 0 && test "$V" = "${{ github.sha }}"
+      - name: Bei ghcr.io anmelden
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Image veröffentlichen
+        if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ghcr.io/realsteeldeal/trainingslog:latest
+          build-args: GIT_SHA=${{ github.sha }}
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+
+  deploy:
+    needs: image
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency: deploy
+    steps:
+      - name: Update auf dem VPS anstoßen
+        env:
+          HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
+        run: |
+          if [ -z "$HOSTINGER_API_TOKEN" ]; then
+            echo "::warning::Secret HOSTINGER_API_TOKEN fehlt – Image ist gebaut, aber nicht ausgerollt."
+            echo "SKIP=1" >> "$GITHUB_ENV"; exit 0
+          fi
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $HOSTINGER_API_TOKEN" -H "Accept: application/json" \
+            "https://developers.hostinger.com/api/vps/v1/virtual-machines/$VPS_ID/docker/$PROJECT/update"
+      - name: Warten, bis die neue Version live ist
+        if: env.SKIP != '1'
+        run: |
+          for i in $(seq 1 40); do
+            V=$(curl -fs "$APP_URL/version.json?t=$(date +%s)" | jq -r .sha || true)
+            if [ "$V" = "${{ github.sha }}" ]; then
+              curl -fs "$APP_URL/api/health" && echo && echo "Live: $V"; exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::Nach 10 Minuten läuft noch Version '$V' statt ${{ github.sha }}."
+          exit 1

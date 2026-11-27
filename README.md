@@ -48,17 +48,24 @@ caddy-snippet.txt           Eintrag für /docker/caddy/Caddyfile
    `PB_URL=https://training.schuetters.at PB_EMAIL=… PB_PASSWORD=… node tools/import-artifact.mjs export.json`
    (mehrfach ausführbar, schon importierte Einheiten werden übersprungen).
 
-## Lokal entwickeln
+## Lokal entwickeln und testen
 
 ```
-# PocketBase lokal starten (Binary von github.com/pocketbase/pocketbase/releases)
-./pocketbase serve --migrationsDir=backend/pb_migrations
-cd web && npm install && npm run dev     # leitet /api an :8090 weiter
+# PocketBase 0.40.6 von github.com/pocketbase/pocketbase/releases ins Repo-Root
+./pocketbase serve --dir=backend/pb_data --migrationsDir=backend/pb_migrations
+cd web && npm ci && npm run dev        # leitet /api und /_/ an :8090 weiter
+npm run test:unit                       # Logik (Vorlagen, Offline-Outbox)
+npm run build && npm run test:e2e       # Browser-Tests mit gemockter API
 ```
+
+## Automatisches Ausrollen
+
+Jeder Push auf `main` testet, baut das Image, prüft es im Container und rollt es über die Hostinger-API auf dem VPS aus. Voraussetzung: Repo-Secret `HOSTINGER_API_TOKEN` (hPanel → Profil → API). Fehlt es, wird nur gebaut. Details in `CLAUDE.md`.
 
 ## Stand
 
 - [x] Schema, Startdaten, Docker, PWA-Grundgerüst, Import
 - [x] MVP: Einheit aus Vorlage starten, Sätze erfassen mit Vorwerten, Timer, Supersatz-Pausen, Abschluss, Offline-Outbox
+- [x] Tests (Unit + Playwright), automatisches Ausrollen
 - [ ] Auswertungen pro Einheit, Woche, Monat, Jahr, Übung; CSV-Export
 - [ ] Progressionsvorschläge, Phasenwechsel, Schulter-Auswertung
