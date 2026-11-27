@@ -8,7 +8,7 @@ const user = { id: 'u1', email: 'test@example.at', collectionId: '_pb_users_auth
 // `db` aus einem früheren Aufruf übergeben, um ein zweites Gerät mit demselben Konto zu simulieren.
 export async function mockApi(page, { offline = () => false, failWrites = () => false, preset = {}, db: shared = null } = {}) {
 	const seed = loadSeed();
-	const db = shared || { sessions: [], set_logs: [], cardio_logs: [], user: { ...user, phase_log: [] }, patches: [], ...structuredClone(preset) };
+	const db = shared || { sessions: [], set_logs: [], cardio_logs: [], user: { ...user, phase_log: [] }, patches: [], push: [], ...structuredClone(preset) };
 	const list = (items) => ({ page: 1, perPage: 500, totalItems: items.length, totalPages: 1, items });
 	await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
 	await page.route(/\/api\//, async (route) => {
@@ -16,6 +16,13 @@ export async function mockApi(page, { offline = () => false, failWrites = () => 
 		const req = route.request();
 		const url = req.url();
 		if (/auth-with-password|auth-refresh/.test(url)) return route.fulfill({ json: { token, record: db.user } });
+		const p = /\/api\/push\/([a-z]+)/.exec(url)?.[1];
+		if (p) {
+			if (p === 'key') return route.fulfill({ json: { publicKey: 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U' } });
+			db.push.push({ path: p, body: JSON.parse(req.postData() || '{}') });
+			if (p === 'test') return route.fulfill({ json: { sent: 1 } });
+			return route.fulfill({ json: { ok: true } });
+		}
 		const c = /\/collections\/([a-z_]+)\/records/.exec(url)?.[1];
 		if (!c) return route.fulfill({ status: 404, json: {} });
 		if (c === 'users') {

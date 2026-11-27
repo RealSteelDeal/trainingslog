@@ -2,16 +2,17 @@
 
 Web-App zum Erfassen und Auswerten von Trainingseinheiten. Läuft im Browser und lässt sich als App installieren (PWA). Mehrbenutzerfähig, vorerst ein Konto.
 
-**Stack:** PocketBase 0.40.6 (Backend, SQLite, Login, REST-API, Admin-Oberfläche) · SvelteKit 2 + Svelte 5 als statische PWA · Docker.
+**Stack:** PocketBase 0.40.6 als Go-Programm (Backend, SQLite, Login, REST-API, Admin-Oberfläche, Web Push) · SvelteKit 2 + Svelte 5 als statische PWA · Docker.
 
 PocketBase liefert das gebaute Frontend selbst aus. Ein einziger Container reicht; HTTPS macht der vorhandene Caddy auf dem VPS.
 
 ## Aufbau
 
 ```
-backend/pb_migrations/      Datenbankschema + Startdaten (Übungen, Vorlagen)
-web/src/lib/                Datenzugriff, Vorlagen-Auflösung, Offline-Outbox, laufende Einheit
-web/src/routes/             Startseite (/), Einheit (/einheit)
+backend/pb_migrations/      Datenbankschema + Startdaten (Übungen, Vorlagen, Hilfetexte)
+backend/main.go, push/      PocketBase + Push-Versand (Pausen, Timer, Erinnerungen, Wochenrückblick)
+web/src/lib/                Datenzugriff, Vorlagen-Auflösung, Offline-Outbox, laufende Einheit, Push
+web/src/routes/             Start (/), Einheit (/einheit), Auswertungen (/auswertung), Einstellungen (/einstellungen)
 tools/import-artifact.mjs   Import der Daten aus dem claude.ai-Artefakt
 Dockerfile                  baut Frontend und PocketBase in ein Image
 docker-compose.yml          Container im Netzwerk "web" hinter dem vorhandenen Caddy
@@ -34,6 +35,8 @@ caddy-snippet.txt           Eintrag für /docker/caddy/Caddyfile
 | `sessions` | Einheit: Start, Dauer, Volumen, Schulter 0–10, Notiz | nur eigene |
 | `set_logs` | Satz: Übung, Satznummer, kg, Wdh, optional RPE | über die Einheit |
 | `cardio_logs` | Aufwärmen/Ausdauer: Gerät, Minuten, Distanz, Puls | über die Einheit |
+| `users` | Konto, dazu `phase_log` (Phasenwechsel) und `notify` (Benachrichtigungen, Trainingsplan) | nur eigenes |
+| `push_subscriptions`, `push_jobs`, `push_keys` | Geräte, geplante Meldungen, VAPID-Schlüssel | nur über `/api/push/*` |
 
 ## Deployment auf dem VPS (srv1972658, Ubuntu 24.04, Docker, Caddy im Netzwerk `web`)
 
@@ -51,10 +54,10 @@ caddy-snippet.txt           Eintrag für /docker/caddy/Caddyfile
 ## Lokal entwickeln und testen
 
 ```
-# PocketBase 0.40.6 von github.com/pocketbase/pocketbase/releases ins Repo-Root
-./pocketbase serve --dir=backend/pb_data --migrationsDir=backend/pb_migrations
+(cd backend && go run . serve --dir=pb_data --migrationsDir=pb_migrations)   # Go lädt die Toolchain laut go.mod
+(cd backend && go test ./...)          # Backend-Tests gegen echte Datenbank
 cd web && npm ci && npm run dev        # leitet /api und /_/ an :8090 weiter
-npm run test:unit                       # Logik (Vorlagen, Offline-Outbox)
+npm run test:unit                       # Logik (Vorlagen, Outbox, Auswertungen, Push)
 npm run build && npm run test:e2e       # Browser-Tests mit gemockter API
 ```
 
@@ -67,5 +70,8 @@ Jeder Push auf `main` testet, baut das Image, prüft es im Container und rollt e
 - [x] Schema, Startdaten, Docker, PWA-Grundgerüst, Import
 - [x] MVP: Einheit aus Vorlage starten, Sätze erfassen mit Vorwerten, Timer, Supersatz-Pausen, Abschluss, Offline-Outbox
 - [x] Tests (Unit + Playwright), automatisches Ausrollen
-- [ ] Auswertungen pro Einheit, Woche, Monat, Jahr, Übung; CSV-Export
-- [ ] Progressionsvorschläge, Phasenwechsel, Schulter-Auswertung
+- [x] Auswertungen: Woche (Soll/Ist), Verlauf pro Übung, Schulterwert; CSV-Export
+- [x] Steigerungsvorschlag, Phasenwechsel am Konto, Übungshilfe, Redesign fürs iPhone
+- [x] Push-Benachrichtigungen: Pausen-/Timer-Ende, Trainingserinnerung nach eigenem Plan, Upload-Hinweis, Wochenrückblick
+- [ ] Einheiten nachträglich bearbeiten/löschen
+- [ ] Auswertung pro Monat/Jahr, SVG-Piktogramme für die Übungshilfe

@@ -5,6 +5,7 @@
 	import { loadCatalog, cachedCatalog, loadLastValues, resolveTemplate } from '$lib/data';
 	import { readOutbox, onOutbox, flush } from '$lib/outbox';
 	import { live, startSession } from '$lib/live.svelte.js';
+	import { scheduleUploadCheck } from '$lib/push';
 	import { cachedPhaseLog, onPhaseLog, phaseAt, setPhase, syncPhaseLog } from '$lib/phase';
 
 	let user = $state(pb.authStore.isValid ? pb.authStore.record : null);
@@ -45,6 +46,7 @@
 
 	function start(t) {
 		startSession(t.key, t.phases?.length ? phaseKey : '');
+		scheduleUploadCheck(live.s.startedAt);
 		goto('/einheit');
 	}
 
@@ -131,6 +133,11 @@
 			<span aria-hidden="true">›</span>
 		</a>
 
+		<a class="card statlink" href="/einstellungen">
+			<span><b>Einstellungen</b><small>Benachrichtigungen und Trainingsplan</small></span>
+			<span aria-hidden="true">›</span>
+		</a>
+
 		<section>
 			<h2 class="sec">Letzte Einheiten</h2>
 			{#if recent.length}
@@ -180,6 +187,7 @@
 	.flow li + li::before { content: '→ '; }
 	.tpl button { min-height: 52px; font-size: 17px; }
 	.tpl button:disabled { background: var(--soft); color: var(--mute); opacity: 1; }
+	.statlink + .statlink { margin-top: 10px; }
 	.statlink { display: flex; justify-content: space-between; align-items: center; margin-top: 26px; text-decoration: none; color: var(--ink); min-height: 64px; }
 	.statlink b { display: block; font-size: 17px; }
 	.statlink small { color: var(--mute); font-size: 14px; }

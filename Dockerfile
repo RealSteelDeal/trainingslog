@@ -8,14 +8,18 @@ RUN npm run build
 ARG GIT_SHA=dev
 RUN printf '{"sha":"%s"}\n' "$GIT_SHA" > build/version.json
 
-# 2) PocketBase mit Migrationen und gebautem Frontend
-FROM alpine:3.22
-ARG PB_VERSION=0.40.6
-ARG TARGETARCH=amd64
-RUN apk add --no-cache ca-certificates unzip wget \
- && wget -q "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_${TARGETARCH}.zip" -O /tmp/pb.zip \
- && unzip /tmp/pb.zip pocketbase -d /pb && rm /tmp/pb.zip
+# 2) PocketBase als Go-Programm (offizielle Version + Push-Versand), Version in backend/go.mod
+FROM golang:1.27.4-alpine AS pb
+WORKDIR /src
+COPY backend/go.mod backend/go.sum ./
+RUN go mod download
+COPY backend/ ./
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/pocketbase .
 
+# 3) Laufzeit: Binary, Migrationen, gebautes Frontend
+FROM alpine:3.22
+RUN apk add --no-cache ca-certificates wget
+COPY --from=pb /out/pocketbase /pb/pocketbase
 COPY backend/pb_migrations /pb/pb_migrations
 COPY --from=web /app/build /pb/pb_public
 VOLUME /pb/pb_data
