@@ -156,3 +156,24 @@ test('Kopfzeile flackert nicht an der Umschaltschwelle', async ({ page }) => {
 		expect(new Set(states.slice(3)).size, `scrollY ${y}`).toBe(1);
 	}
 });
+
+test('Steigerungsvorschlag: anzeigen, übernehmen, nur wenn alle Sätze oben waren', async ({ page }) => {
+	const db = await mockApi(page);
+	const add = (key, set_no, kg, reps) => db.set_logs.push({ id: `${key}${set_no}`, session: 's_alt', set_no, kg, reps, expand: { exercise: { key }, session: { id: 's_alt' } } });
+	add('bp', 2, 60, 15); add('bp', 1, 60, 15);
+	add('lz', 2, 35, 13); add('lz', 1, 35, 15);
+	await login(page);
+	await page.locator('.tpl').first().locator('button.primary').click();
+
+	const bp = item(page, 'Beinpresse');
+	await expect(bp.locator('.prog-hint')).toContainText('Steigern auf 62,5 kg');
+	await expect(item(page, 'Latzug').locator('.prog-hint')).toHaveCount(0);
+	await expect(page.locator('[aria-label="Gewicht Beinpresse"]')).toHaveValue('60');
+
+	await bp.getByRole('button', { name: /Steigerung für Beinpresse übernehmen/ }).click();
+	await expect(page.locator('[aria-label="Gewicht Beinpresse"]')).toHaveValue('62.5');
+	await expect(page.locator('[aria-label="Wiederholungen Beinpresse"]')).toHaveValue('12');
+	await expect(bp.locator('.prog-hint')).toContainText('✓ übernommen');
+	await page.reload();
+	await expect(page.locator('[aria-label="Gewicht Beinpresse"]')).toHaveValue('62.5');
+});
