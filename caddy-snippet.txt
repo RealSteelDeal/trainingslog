@@ -1,0 +1,5 @@
+# In /docker/caddy/Caddyfile ergänzen, danach: docker exec caddy caddy reload --config /etc/caddy/Caddyfile
+training.schuetters.at {
+	encode zstd gzip
+	reverse_proxy trainingslog:8090
+}

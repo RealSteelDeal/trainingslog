@@ -1,0 +1,15 @@
+# Auf dem VPS: läuft hinter dem vorhandenen Caddy-Container im externen Netzwerk "web"
+# (gleiches Muster wie vaultwarden). Kein Port nach außen.
+services:
+  trainingslog:
+    image: ${IMAGE:-ghcr.io/realsteeldeal/trainingslog:latest}
+    build: .
+    container_name: trainingslog
+    restart: unless-stopped
+    volumes:
+      - ./pb_data:/pb/pb_data
+    networks: [web]
+
+networks:
+  web:
+    external: true
