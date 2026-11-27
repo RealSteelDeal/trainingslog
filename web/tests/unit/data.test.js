@@ -50,3 +50,13 @@ test('Phasen-Ausdrücke und Wdh-Standard', () => {
 	assert.equal(defaultReps('12–15'), 15);
 	assert.equal(defaultReps('12'), 12);
 });
+
+test('Hilfetexte: jede Übung hat Gerät, Ausführung und Schulter-Hinweis', () => {
+	for (const e of exercises) {
+		assert.ok(e.help, `${e.key} ohne Hilfe`);
+		assert.ok(e.help.geraet && e.help.schulter, e.key);
+		assert.ok(e.help.ausfuehrung.length >= 3, e.key);
+		assert.ok(Array.isArray(e.help.alternativen) && Array.isArray(e.help.fehler), e.key);
+	}
+	assert.match(exercises.find((e) => e.key === 'hy').help.geraet, /Hyperextension-Bank/);
+});

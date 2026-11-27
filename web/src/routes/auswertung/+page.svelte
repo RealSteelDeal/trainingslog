@@ -73,7 +73,7 @@
 
 <main>
 	<header>
-		<a class="btn back" href="/" aria-label="Zurück zur Startseite">‹ Start</a>
+		<a class="back" href="/" aria-label="Zurück zur Startseite">‹</a>
 		<h1>Auswertungen</h1>
 	</header>
 
@@ -242,7 +242,7 @@
 
 <style>
 	header { display: flex; align-items: center; gap: 12px; }
-	.back { padding: 0 12px; flex: none; }
+	.back { width: 44px; height: 44px; flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--soft); color: var(--ink); text-decoration: none; font-size: 26px; line-height: 1; padding-bottom: 3px; }
 	.tabs {
 		position: sticky; top: env(safe-area-inset-top); z-index: 2; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
 		margin: 16px 0 4px; padding: 4px; background: var(--soft); border-radius: 12px;

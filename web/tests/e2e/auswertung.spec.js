@@ -84,9 +84,9 @@ test('Wartende Outbox-Einheit fließt in alle Auswertungen ein', async ({ page }
 	await login(page);
 	await page.locator('.tpl').first().locator('button.primary').click();
 	await page.fill('[aria-label="Gewicht Beinpresse"]', '70');
-	await page.locator('.it', { hasText: 'Beinpresse' }).locator('[aria-label="Satz 1"]').click();
+	await page.locator('.it').filter({ has: page.locator('h3', { hasText: 'Beinpresse' }) }).locator('[aria-label="Satz 1"]').click();
 	await page.locator('input[type=range]').fill('5');
-	await page.fill('input[placeholder]', '30');
+	await page.getByLabel('Ausdauer-Minuten').fill('30');
 	failWrites = true;
 	await page.click('text=Einheit speichern');
 	await expect(page.getByText('1 Einheit wartet auf Upload')).toBeVisible();

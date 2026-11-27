@@ -18,17 +18,18 @@ web/src/lib/outbox.js        Offline-Warteschlange, schrittweiser Upload mit cli
 web/src/lib/live.svelte.js   laufende Einheit ($state + localStorage), Zeiten über Zeitstempel
 web/src/lib/stats.js         Auswertungen: Server-Daten + Outbox zusammenführen, Wochen-Soll/Ist, CSV
 web/src/lib/*Chart.svelte    Diagramme als Inline-SVG, ohne Bibliothek
+web/src/lib/ExerciseHelp.svelte  Bottom-Sheet mit Übungshilfe (Gerät, Ausführung, Schulter, Fehler, Alternativen)
 web/src/routes/+page.svelte  Login, Vorlagen, letzte Einheiten, Sync-Status
-web/src/routes/einheit/      Einheit erfassen und abschließen
+web/src/routes/einheit/      Einheit erfassen und abschließen (Übungskarten mit Stepper, „Jetzt“-Markierung, Hilfe)
 web/src/routes/auswertung/   Woche (Soll/Ist), Verlauf pro Übung, Schulterwert, CSV-Export
-web/tests/unit/              node:test (Vorlagen, Outbox, Auswertungen) – liest Startdaten aus der Seed-Migration
+web/tests/unit/              node:test (Vorlagen, Outbox, Auswertungen) – liest Startdaten und Hilfetexte aus den Daten-Migrationen
 web/tests/e2e/               Playwright gegen gemockte API (tests/helpers/mock-api.js)
 tools/import-artifact.mjs    Import des JSON-Exports aus dem alten claude.ai-Artefakt
 ```
 
 ## Datenmodell
 
-`exercises` (key, name, kind kraft|cardio|schulter) · `templates` (key, kind, `phases` JSON, `blocks` JSON) · `sessions` (user, template, kind, phase, started, duration_min, volume_kg, shoulder 0–10, note, prep_done, client_id) · `set_logs` (session, exercise, set_no, kg, reps, rpe) · `cardio_logs` (session, phase aufwaermen|ausdauer, device, minutes, distance_km, avg_hr).
+`exercises` (key, name, kind kraft|cardio|schulter, hint, `help` JSON: geraet, ausfuehrung[], schulter, fehler[], alternativen[]) · `templates` (key, kind, `phases` JSON, `blocks` JSON) · `sessions` (user, template, kind, phase, started, duration_min, volume_kg, shoulder 0–10, note, prep_done, client_id) · `set_logs` (session, exercise, set_no, kg, reps, rpe) · `cardio_logs` (session, phase aufwaermen|ausdauer, device, minutes, distance_km, avg_hr).
 
 Übungen/Vorlagen ohne `user` sind global. Einheiten und ihre Kind-Datensätze sieht nur der Besitzer (API-Regeln in der Init-Migration). Vorlagen-Werte wie `"phase.sets"` oder `"phase.cardio_min*60"` löst `resolveValue` auf.
 
@@ -37,7 +38,7 @@ tools/import-artifact.mjs    Import des JSON-Exports aus dem alten claude.ai-Art
 - **Migrationen nie nachträglich ändern.** Jede Schema- oder Datenänderung ist eine neue Datei `backend/pb_migrations/<unix-timestamp>_<name>.js` mit `up` und `down`. Die Live-Datenbank hat die alten schon ausgeführt.
 - **Offline zuerst:** Schreibzugriffe aus der Einheit laufen über die Outbox, nie direkt. Neue Kind-Tabellen in `outbox.js` schrittweise mit Fortschrittszähler hochladen, damit ein Abbruch keine Duplikate erzeugt.
 - **Svelte-5-Falle:** Bei `$state`-Objekten nie `const x = (s.a[k] ||= [])` – das liefert das rohe Array statt des Proxys, Änderungen gehen verloren. Erst zuweisen, dann `s.a[k]` lesen. Kein Schreiben in `$state` während des Renderns.
-- **Mobile:** Touch-Ziele mindestens 44 px, Eingaben 16 px (kein iOS-Zoom), Layout ab 360 px Breite prüfen, dunkles und helles Theme über `light-dark()`.
+- **Mobile:** Referenzgerät iPhone 12 (390 × 844, Safe Areas). Touch-Ziele mindestens 44 px, Eingaben 16 px (kein iOS-Zoom), Layout ab 360 px Breite prüfen, dunkles und helles Theme über `light-dark()`. `tests/e2e/ui.spec.js` prüft Touch-Ziele und horizontalen Scroll.
 - **Texte in der App deutsch**, Code-Namen englisch: JS camelCase, Komponenten PascalCase, DB-Felder snake_case. Clean Code, Kommentare nur wo das Warum nicht offensichtlich ist.
 - Abhängigkeiten exakt pinnen (`--save-exact`), keine Releases jünger als zwei Wochen.
 - Keine Zugangsdaten ins Repo. Secrets nur als GitHub-Secrets.
@@ -48,6 +49,7 @@ tools/import-artifact.mjs    Import des JSON-Exports aus dem alten claude.ai-Art
 - Ablauf: 10 min Aufwärmen auf Gerät → Schulter-Vorbereitung am Kabelzug (Außenrotation, Pull-Aparts, Face Pulls) → Kraft in Supersätzen A–D → Ausdauer Zone 2.
 - Phase a (Woche 1–2): 2 Sätze, Kraft 22 / Ausdauer 28 min. Phase b (ab Woche 3): 3 Sätze, Kraft 30 / Ausdauer 20 min.
 - Schulter zweimal am Labrum operiert. Keine Übungen vorschlagen mit Dips, Nackendrücken/-latzug, Butterfly mit tiefer Dehnung, breitem Bankdrücken bis zur Brust, schwerem Überkopfdrücken. Schulterwert 0–10 wird pro Einheit erfasst.
+- Hilfetexte der Übungen (Migration `1795795200_exercise_help.js`) sind allgemeines Trainingswissen, nicht fachlich geprüft; Anpassung nach den ersten Trainings. Stufe 2: eigene SVG-Piktogramme pro Gerät.
 - Ziel: Gesundheit und Ausdauer zuerst, dazu Rücken (Ausgleich Bürojob), Brust, Arme.
 - Auswertung: Wochen-Soll fest 2 Krafttage und Zone 2 = 2 × `cardio_min` der auf der Startseite gewählten Phase. Mittwoch ist Bonus, nicht im Soll. WHO 150 min (Zone 2 + Aufwärmen) nur als neutraler Hinweis, ohne Ampel. Wartende Outbox-Einheiten zählen mit.
 

@@ -18,7 +18,7 @@ export async function loadCatalog() {
 			pb.collection('templates').getFullList({ sort: 'sort' })
 		]);
 		const cat = {
-			exercises: exercises.map(({ id, key, name, kind, hint }) => ({ id, key, name, kind, hint })),
+			exercises: exercises.map(({ id, key, name, kind, hint, help }) => ({ id, key, name, kind, hint, help: help || null })),
 			templates: templates.map(({ id, key, name, kind, phases, blocks }) => ({ id, key, name, kind, phases, blocks }))
 		};
 		write(CAT_KEY, cat);

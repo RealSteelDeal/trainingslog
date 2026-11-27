@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { mockApi, login } from '../helpers/mock-api.js';
 
-const item = (page, name) => page.locator('.it', { hasText: name });
+const item = (page, name) => page.locator('.it').filter({ has: page.locator('h3', { hasText: name }) });
 
 test('Einheit erfassen, neu laden, speichern und hochladen', async ({ page }) => {
 	const db = await mockApi(page);
