@@ -1,7 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { cachedCatalog, cachedLastValues, resolveTemplate, defaultReps, rememberLastValues } from '$lib/data';
+	import { cachedCatalog, cachedLastValues, resolveTemplate, defaultReps, rememberLastValues, progressionHint } from '$lib/data';
 	import { enqueue, flush } from '$lib/outbox';
 	import { live, persist, discardSession, elapsedSec, timerLeft } from '$lib/live.svelte.js';
 	import ExerciseHelp from '$lib/ExerciseHelp.svelte';
@@ -47,6 +47,13 @@
 		return g[g.indexOf(it) + 1] || null;
 	};
 	const STEP = { kg: 2.5, reps: 1 };
+	const fmtKg = (v) => String(v).replace('.', ',');
+	const hintFor = (it) => (it.type === 'sets' ? progressionHint(last[it.key], it.reps) : null);
+	function applyHint(it, h) {
+		s.inputs[it.key].kg = String(h.kg);
+		s.inputs[it.key].reps = String(h.reps);
+		persist();
+	}
 	function step(it, field, dir) {
 		const v = Math.max(0, num(s.inputs[it.key][field]) + dir * STEP[field]);
 		s.inputs[it.key][field] = String(Math.round(v * 100) / 100);
@@ -221,6 +228,18 @@
 							{#if it.type === 'sets' && last[it.key]?.length}
 								<p class="last">Letztes Mal: {last[it.key].map((x) => `${x.kg} kg × ${x.reps}`).join(' · ')}</p>
 							{/if}
+							{@const h = hintFor(it)}
+							{#if h}
+								{@const taken = s.inputs[it.key]?.kg !== '' && Number(String(s.inputs[it.key].kg).replace(',', '.')) >= h.kg}
+								<div class="prog-hint" class:taken>
+									<span><b>↑ Steigern auf {fmtKg(h.kg)} kg</b><small>Letztes Mal alle Sätze mit {h.top} Wdh geschafft</small></span>
+									{#if taken}
+										<span class="ok-mark">✓ übernommen</span>
+									{:else}
+										<button onclick={() => applyHint(it, h)} aria-label="Steigerung für {it.name} übernehmen: {fmtKg(h.kg)} kg">Übernehmen</button>
+									{/if}
+								</div>
+							{/if}
 						{/if}
 						{#if it.type === 'sets'}
 							{#if !isDone(it)}
@@ -385,6 +404,14 @@
 	}
 	.hint { margin: 10px 0 0; font-size: 14px; color: var(--mute); }
 	.last { margin: 6px 0 0; color: var(--sup); font-size: 14px; font-weight: 500; }
+	.prog-hint {
+		display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; padding: 8px 8px 8px 12px;
+		border-radius: 12px; background: color-mix(in srgb, #2f9e8f 14%, var(--card)); border: 1px solid color-mix(in srgb, #2f9e8f 45%, transparent);
+	}
+	.prog-hint b { display: block; font-size: 15px; }
+	.prog-hint small { font-size: 13px; color: var(--mute); }
+	.prog-hint button { flex: none; background: #1f7a6e; border: 0; color: #fff; }
+	.ok-mark { flex: none; font-size: 14px; font-weight: 600; color: light-dark(#1f6f64, #5fd3c2); padding-right: 6px; }
 
 	.steppers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
 	.stepper { display: grid; gap: 4px; }

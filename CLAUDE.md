@@ -52,6 +52,7 @@ tools/import-artifact.mjs    Import des JSON-Exports aus dem alten claude.ai-Art
 - Schulter zweimal am Labrum operiert. Keine Übungen vorschlagen mit Dips, Nackendrücken/-latzug, Butterfly mit tiefer Dehnung, breitem Bankdrücken bis zur Brust, schwerem Überkopfdrücken. Schulterwert 0–10 wird pro Einheit erfasst.
 - Hilfetexte der Übungen (Migration `1795795200_exercise_help.js`) sind allgemeines Trainingswissen, nicht fachlich geprüft; Anpassung nach den ersten Trainings. Stufe 2: eigene SVG-Piktogramme pro Gerät.
 - Ziel: Gesundheit und Ausdauer zuerst, dazu Rücken (Ausgleich Bürojob), Brust, Arme.
+- Steigerungsvorschlag: Haben beim letzten Mal alle Sätze einer Übung die obere Wdh-Grenze erreicht, schlägt die Karte das schwerste Gewicht + 2,5 kg vor (`progressionHint` in `data.js`). Übernehmen setzt kg und Wdh auf die untere Grenze; nichts wird automatisch geändert.
 - Auswertung: Wochen-Soll fest 2 Krafttage und Zone 2 = 2 × `cardio_min` der Phase, die in der jeweiligen Woche galt. Ein Phasenwechsel (Startseite) gilt ab dem Montag der Woche, in der er eingestellt wird, und liegt am Benutzerkonto (alle Geräte gleich; vergangene Wochen behalten ihr Soll). Vor dem ersten Wechsel gilt Phase a. Mittwoch ist Bonus, nicht im Soll. WHO 150 min (Zone 2 + Aufwärmen) nur als neutraler Hinweis, ohne Ampel. Wartende Outbox-Einheiten zählen mit.
 
 ## Befehle
